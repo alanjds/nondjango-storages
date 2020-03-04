@@ -1,5 +1,5 @@
 [build-system]
-requires = ['flit']
+requires = ['flit >= 1.1']
 build-backend = "flit.buildapi"
 
 [tool.flit.metadata.requires-extra]
@@ -13,6 +13,7 @@ dist-name = "nondjango-storages"
 module = "nondjango"
 author = "Alan Justino da Silva"
 author-email = "alan.justino@yahoo.com.br"
+home-page = "https://github.com/alanjds/nondjango-storages/"
 requires = [
     'boto3',
 ]
