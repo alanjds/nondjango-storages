@@ -205,7 +205,7 @@ class S3Storage(BaseStorage):
         try:
             return self.s3.create_bucket(Bucket=self._bucket_name)
         except ClientError as e:
-            if e.response['Error']['Code'] == 'BucketAlreadyExists':
+            if e.response['Error']['Code'] in ['BucketAlreadyExists', 'BucketAlreadyOwnedByYou']:
                 return self.s3.Bucket(self._bucket_name)
             else:
                 raise e
