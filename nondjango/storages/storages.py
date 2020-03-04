@@ -9,7 +9,6 @@ from io import BytesIO, StringIO
 from .utils import prepare_path, md5s3
 from .files import File
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -56,8 +55,7 @@ def safe_join(base, *paths):
     # the base path is /.
     base_path_len = len(base_path)
     if (not final_path.startswith(base_path) or final_path[base_path_len] != '/'):
-        raise ValueError('the joined path is located outside of the base path'
-                         ' component')
+        raise ValueError('the joined path is located outside of the base path component')
 
     return final_path if starts_on_root else final_path.lstrip('/')
 
@@ -237,7 +235,7 @@ class S3Storage(BaseStorage):
                 logger.warning('Bucket does not exist, list() returning empty.')
             else:
                 raise
-    
+
     def listdir(self, name):
         valid_name = self.get_valid_name(name)
         path = self._normalize_name(valid_name)
