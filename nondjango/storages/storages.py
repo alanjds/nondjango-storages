@@ -4,6 +4,7 @@ import tempfile
 import boto3
 import posixpath
 from botocore.exceptions import ClientError
+from botocore.client import Config as botocore__Config
 from io import BytesIO, StringIO
 
 from .utils import prepare_path, md5s3
@@ -152,15 +153,19 @@ class S3Storage(BaseStorage):
         # http://boto3.readthedocs.io/en/latest/guide/configuration.html#guide-configuration
         if not self._resource:
             logger.debug('Resource does not exist, creating a new one...')
-            self._resource = boto3.resource(
-                's3',
+            resource_kwargs = dict(
                 aws_access_key_id=self._settings.get('S3CONF_ACCESS_KEY_ID') or self._settings.get('AWS_ACCESS_KEY_ID'),
                 aws_secret_access_key=self._settings.get('S3CONF_SECRET_ACCESS_KEY') or self._settings.get('AWS_SECRET_ACCESS_KEY'),
                 aws_session_token=self._settings.get('S3CONF_SESSION_TOKEN') or self._settings.get('AWS_SESSION_TOKEN'),
                 region_name=self._settings.get('S3CONF_S3_REGION_NAME') or self._settings.get('AWS_S3_REGION_NAME'),
                 use_ssl=self._settings.get('S3CONF_S3_USE_SSL') or self._settings.get('AWS_S3_USE_SSL', True),
                 endpoint_url=self._settings.get('S3CONF_S3_ENDPOINT_URL') or self._settings.get('AWS_S3_ENDPOINT_URL'),
-            )
+            )  # yapf: disable
+            signature_version = (self._settings.get('S3CONF_S3_SIGNATURE_VERSION')
+                                 or self._settings.get('AWS_S3_SIGNATURE_VERSION'))
+            if signature_version:
+                resource_kwargs['config'] = botocore__Config(signature_version=signature_version)
+            self._resource = boto3.resource('s3', **resource_kwargs)
         return self._resource
 
     def read_into_stream(self, file_path, stream=None):
