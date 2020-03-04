@@ -1,6 +1,7 @@
 import os
 import logging
 import tempfile
+import uuid
 
 import pytest
 
@@ -40,7 +41,7 @@ MINIO_S3_SETTINGS = {
     (storages.TemporaryFilesystemStorage, {}),
     (storages.S3Storage, {
         'settings': MINIO_S3_SETTINGS,
-        'workdir': 's3://nondjango-storages-test/storage-test/'
+        'workdir': f's3://nondjango-storages-test/storage-test-{uuid.uuid4()}/'
     }),
 ])
 def test_file_read_write(storage_class, storage_params):
