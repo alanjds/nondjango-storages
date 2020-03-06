@@ -260,6 +260,33 @@ class S3Storage(BaseStorage):
                 files.append(posixpath.relpath(entry['Key'], path))
         return directories, files
 
+    def url(self, name: str):
+        """
+        Returns the URL where the contents of the file referenced by name can be accessed.
+        This can raise NotImplementedError depending on the backend used.
+        """
+        internal_name = self.get_valid_name(name)
+        s3_file = self.s3.Object(self._bucket_name, self._normalize_name(internal_name))
+        try:
+            # See if the resource exists
+            s3_file.e_tag
+        except ClientError as err:
+            err_msg = str(err)
+            if '404' in err_msg and 'Not Found' in err_msg:
+                return None
+            raise
+
+        url = self.s3.meta.client.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket': self._bucket_name,
+                'Key': self._normalize_name(internal_name),
+            },
+            ExpiresIn=3600,
+            HttpMethod=None,
+        )
+        return url
+
 
 class FilesystemStorage(BaseStorage):
     def _validate_path(self, path):
