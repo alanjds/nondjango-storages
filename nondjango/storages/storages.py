@@ -67,7 +67,7 @@ def _strip_prefix(text, prefix):
 
 def _strip_s3_path(path):
     assert path.startswith('s3://')
-    bucket, _, path = path.replace('s3://', '').partition('/')
+    bucket, _, path = _strip_prefix(path, 's3://').partition('/')
     return bucket, path
 
 
