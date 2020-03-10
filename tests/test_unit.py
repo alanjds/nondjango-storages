@@ -3,6 +3,7 @@ import logging
 import tempfile
 import uuid
 
+import requests
 import pytest
 
 from nondjango.storages import utils, files, storages
@@ -62,3 +63,18 @@ def test_file_read_write(storage_class, storage_params):
 
     with storage.open('test_file.txt', 'r') as f2:
         assert f2.read() == payload
+
+
+def test_file_url():
+    storage = storages.S3Storage(settings=MINIO_S3_SETTINGS,
+                                 workdir=f's3://nondjango-storages-test/storage-test-{uuid.uuid4()}/')
+    payload = 'test payload'
+    with storage.open('test_file.txt', 'w+') as f:
+        f.write(payload)
+
+    assert storage.url('inexistant_file') is None, 'Generating URLs for inexistent files?'
+
+    test_file_url = storage.url('test_file.txt')
+    assert test_file_url.startswith('https://play.min.io:9000/nondjango-storages-test/storage-test-')
+    assert '/test_file.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256' in test_file_url
+    assert requests.get(test_file_url).text == payload, 'Generating broken URLs?'
