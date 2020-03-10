@@ -12,22 +12,6 @@ logging.getLogger('boto3').setLevel(logging.ERROR)
 logging.getLogger('botocore').setLevel(logging.ERROR)
 logging.getLogger('s3transfer').setLevel(logging.ERROR)
 
-
-def test_prepare_empty_path():
-    utils.prepare_path('')
-
-
-def test_filesystem_storages_honor_workdir():
-    storage = storages.TemporaryFilesystemStorage()
-    filename = 'test_file.txt'
-    f = storage.open(filename, 'w+')
-    f.write('test payload')
-    f.close()
-
-    workdir = storage._workdir
-    assert filename in os.listdir(workdir), 'File is not on the storage workdir'
-
-
 # From: https://docs.minio.io/docs/aws-cli-with-minio.html
 MINIO_S3_SETTINGS = {
     'AWS_ACCESS_KEY_ID': 'Q3AM3UQ867SPQQA43P2F',
@@ -48,6 +32,21 @@ MINIO_S3_SETTINGS = {
 def storage(request):
     storage_class, init_params = request.param
     yield storage_class(**init_params)
+
+
+def test_prepare_empty_path():
+    utils.prepare_path('')
+
+
+def test_filesystem_storages_honor_workdir():
+    storage = storages.TemporaryFilesystemStorage()
+    filename = 'test_file.txt'
+    f = storage.open(filename, 'w+')
+    f.write('test payload')
+    f.close()
+
+    workdir = storage._workdir
+    assert filename in os.listdir(workdir), 'File is not on the storage workdir'
 
 
 def test_file_read_write(storage):
