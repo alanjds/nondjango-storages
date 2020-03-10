@@ -67,7 +67,7 @@ def _strip_prefix(text, prefix):
 
 def _strip_s3_path(path):
     assert path.startswith('s3://')
-    bucket, _, path = _strip_prefix(path, 's3://').partition('/')
+    bucket, _, path = path.replace('s3://', '').partition('/')
     return bucket, path
 
 
@@ -177,11 +177,10 @@ class S3Storage(BaseStorage):
         return self._resource
 
     def read_into_stream(self, file_path, stream=None):
-        bucket_name, file_name = _strip_s3_path(file_path)
-        assert bucket_name == self._bucket_name
+        file_name = f'{self._workdir}/{file_path}'
 
         stream = stream or BytesIO()
-        bucket = self.s3.Bucket(bucket_name)
+        bucket = self.s3.Bucket(self._bucket_name)
         try:
             bucket.download_fileobj(file_name, stream)
             stream.seek(0)
@@ -189,24 +188,9 @@ class S3Storage(BaseStorage):
         except ClientError as e:
             if e.response['Error']['Code'] == '404':
                 logger.debug('File %s in bucket %s does not exist', file_name, bucket)
-                raise FileNotFoundError(f's3://{bucket_name}/{file_name}')
+                raise FileNotFoundError(f's3://{self._bucket_name}/{file_name}')
             else:
                 raise
-
-    def get_valid_name(self, name):
-        valid_path = super(__class__, self).get_valid_name(name)
-        return 's3://' + f'{self._bucket_name}/{self._workdir}/{valid_path}'.replace('//', '/')
-
-    def _normalize_name(self, name):
-        """
-        Normalizes the name so that paths like /path/to/ignored/../something.txt
-        work. We check to make sure that the path pointed to is not outside
-        the directory specified by the LOCATION setting.
-        """
-        assert name.startswith(f's3://{self._bucket_name}/{self._workdir}/')
-        assert '../' not in name
-        in_bucket_path = name.replace(f's3://{self._bucket_name}/', '')
-        return in_bucket_path
 
     @property
     def _bucket(self) -> 's3.Bucket':
