@@ -68,6 +68,13 @@ def test_file_read_write(storage):
         assert f2.read() == payload
 
 
+def test_file_size(storage):
+    payload = '123456789'
+    with storage.open('test_file.txt', 'w+') as f:
+        f.write(payload)
+    assert storage.size('test_file.txt') == len(payload), 'Wrong size returned?'
+
+
 def test_file_url():
     storage = storages.S3Storage(settings=MINIO_S3_SETTINGS,
                                  workdir=f's3://nondjango-storages-test/storage-test-{uuid.uuid4()}/')

@@ -138,6 +138,14 @@ class BaseStorage:
             return True
         return False
 
+    def size(self, name) -> int:
+        """
+        Returns the total size, in bytes, of the file referenced by name.
+        For storage systems that aren’t able to return the file size
+        this will raise NotImplementedError instead.
+        """
+        raise NotImplementedError()
+
 
 class S3Storage(BaseStorage):
     def __init__(self, settings=None, workdir='s3://s3storage/'):
@@ -260,6 +268,11 @@ class S3Storage(BaseStorage):
                 files.append(posixpath.relpath(entry['Key'], path))
         return directories, files
 
+    def size(self, name: str) -> int:
+        normalized_name = self._normalize_name(self.get_valid_name(name))
+        s3_file = self.s3.Object(self._bucket_name, normalized_name)
+        return s3_file.content_length
+
     def url(self, name: str):
         """
         Returns the URL where the contents of the file referenced by name can be accessed.
@@ -317,6 +330,10 @@ class FilesystemStorage(BaseStorage):
     def save(self, name, content):
         path = self._normalize_name(name)
         open(path, 'wb').write(content)
+
+    def size(self, name):
+        path = self._normalize_name(name)
+        return os.path.getsize(path)
 
     def listdir(self, path):
         self._validate_path(path)
