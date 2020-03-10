@@ -38,16 +38,19 @@ MINIO_S3_SETTINGS = {
 }
 
 
-@pytest.mark.parametrize("storage_class, storage_params", [
-    (storages.TemporaryFilesystemStorage, {}),
-    (storages.S3Storage, {
-        'settings': MINIO_S3_SETTINGS,
-        'workdir': f's3://nondjango-storages-test/storage-test-{uuid.uuid4()}/'
-    }),
-])
-def test_file_read_write(storage_class, storage_params):
+@pytest.fixture(scope="module",
+                params=[(storages.TemporaryFilesystemStorage, {}),
+                        (storages.S3Storage, {
+                            'settings': MINIO_S3_SETTINGS,
+                            'workdir': f's3://nondjango-storages-test/storage-test-{uuid.uuid4()}/'
+                        })])
+def storage(request):
+    storage_class, init_params = request.param
+    yield storage_class(**init_params)
+
+
+def test_file_read_write(storage):
     payload = 'test payload'
-    storage = storage_class(**storage_params)
     try:
         storage.delete('test_file.txt')
     except NotImplementedError:
