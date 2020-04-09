@@ -51,15 +51,11 @@ class File(ContextDecorator):
             return True
         return False
 
-    def md5(self, raise_if_not_exists=True):
-        try:
-            md5hash, _ = next(self.storage.list(self.name))
-        except StopIteration:
-            if raise_if_not_exists:
-                raise FileNotFoundError(self.name)
-            else:
-                md5hash = None
-        return md5hash
+    def hash(self, function='', raise_if_not_exists=True):
+        result = self.storage._file_hash(self, function=function)
+        if result is None and raise_if_not_exists:
+            raise FileNotFoundError(self.name)
+        return result
 
     def write(self, data):
         if 'w' not in self.mode and 'a' not in self.mode and '+' not in self.mode:

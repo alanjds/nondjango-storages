@@ -3,6 +3,7 @@ import logging
 import tempfile
 import boto3
 import posixpath
+import hashlib
 from botocore.exceptions import ClientError
 from botocore.client import Config as botocore__Config
 from io import BytesIO, StringIO
@@ -146,6 +147,19 @@ class BaseStorage:
         """
         raise NotImplementedError()
 
+    def _file_hash(self, file: File, function='') -> str:
+        """
+        Returns a hash of the file, possibly calculated by the storage in an
+        optimized way. The hash is calculated with the well-known function name
+        'function', e.g. 'md5' or 'sha256'. If 'function' is empty it is chosen
+        by the storage.
+
+        If the hash cannot be calculated, the storage should return None.
+        """
+        if file.storage != self:
+            raise RuntimeError('Cannot answer hash of a File from another storage')
+        return None
+
 
 class S3Storage(BaseStorage):
     def __init__(self, settings=None, workdir='s3://s3storage/'):
@@ -205,7 +219,23 @@ class S3Storage(BaseStorage):
     def _write(self, f, file_name):
         internal_name = self._normalize_name(file_name)
         logger.info('Writing to s3://%s/%s', self._bucket_name, internal_name)
-        self._bucket.upload_fileobj(f, internal_name)
+
+        f.seek(0)
+        content_md5 = hashlib.md5(f.read()).hexdigest()
+        f.seek(0)
+        content_sha256 = hashlib.sha256(f.read()).hexdigest()
+
+        f.seek(0)
+        self._bucket.upload_fileobj(
+            f,
+            internal_name,
+            ExtraArgs={
+                "Metadata": {
+                    'md5': content_md5,
+                    'sha256': content_sha256,
+                },
+            },
+        )
 
     def delete(self, name):
         internal_name = self.get_valid_name(name)
@@ -256,6 +286,27 @@ class S3Storage(BaseStorage):
         normalized_name = self._normalize_name(self.get_valid_name(name))
         s3_file = self.s3.Object(self._bucket_name, normalized_name)
         return s3_file.content_length
+
+    def _file_hash(self, file: File, function='') -> str:
+        if file.storage != self:
+            raise RuntimeError('Cannot answer hash of a File from another storage')
+
+        internal_name = self.get_valid_name(file.name)
+        s3_file = self.s3.Object(self._bucket_name, self._normalize_name(internal_name))
+        try:
+            # On S3 the E-Tag is the hash
+            s3_file.e_tag
+        except ClientError as err:
+            err_msg = str(err)
+            if '404' in err_msg and 'Not Found' in err_msg:
+                return None
+            raise
+
+        if function:
+            metadata = {k.lower(): v for k, v in s3_file.metadata.items()}
+            return metadata.get(function, None)
+        else:
+            return s3_file.e_tag
 
     def url(self, name: str):
         """
@@ -343,6 +394,18 @@ class FilesystemStorage(BaseStorage):
                 # the relative path of a file to itself is empty
                 # same behavior as in boto3
                 yield md5s3(open(fixed_path, 'rb')), ''
+
+    def _file_hash(self, file: File, function='') -> str:
+        function = function or 'md5'
+        if file.storage != self:
+            raise RuntimeError('Cannot answer hash of a File from another storage')
+
+        if hasattr(hashlib, function):
+            hasher = getattr(hashlib, function)
+            with open(file.name, 'br') as opened:
+                return hasher(opened.read()).hexdigest()
+        else:
+            return None
 
 
 class TemporaryFilesystemStorage(FilesystemStorage):
