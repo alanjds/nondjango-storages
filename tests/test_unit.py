@@ -75,6 +75,19 @@ def test_file_size(storage):
     assert storage.size('test_file.txt') == len(payload), 'Wrong size returned?'
 
 
+def test_file_hash(storage):
+    payload = '123456789'
+    md5 = '25f9e794323b453885f5181f1b624d0b'
+    sha256 = '15e2b0d3c33891ebb0f1ef609ec419420c20e320ce94c65fbc8c3312448eb225'
+    with storage.open('test_file.txt', 'w+') as f:
+        f.write(payload)
+
+    f = storage.open('test_file.txt')
+    assert f.hash('md5') == md5, 'Wrong MD5 hash?'
+    assert f.hash('sha256') == sha256, 'Wrong sha256 hash?'
+    assert f.hash() is not None, 'Storage without a default hash function?'
+
+
 def test_file_url():
     storage = storages.S3Storage(settings=MINIO_S3_SETTINGS,
                                  workdir=f's3://nondjango-storages-test/storage-test-{uuid.uuid4()}/')
