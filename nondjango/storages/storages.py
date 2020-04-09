@@ -138,6 +138,14 @@ class BaseStorage:
             return True
         return False
 
+    def size(self, name) -> int:
+        """
+        Returns the total size, in bytes, of the file referenced by name.
+        For storage systems that aren’t able to return the file size
+        this will raise NotImplementedError instead.
+        """
+        raise NotImplementedError()
+
 
 class S3Storage(BaseStorage):
     def __init__(self, settings=None, workdir='s3://s3storage/'):
@@ -169,11 +177,10 @@ class S3Storage(BaseStorage):
         return self._resource
 
     def read_into_stream(self, file_path, stream=None):
-        bucket_name, file_name = _strip_s3_path(file_path)
-        assert bucket_name == self._bucket_name
+        file_name = f'{self._workdir}/{file_path}'
 
         stream = stream or BytesIO()
-        bucket = self.s3.Bucket(bucket_name)
+        bucket = self.s3.Bucket(self._bucket_name)
         try:
             bucket.download_fileobj(file_name, stream)
             stream.seek(0)
@@ -181,24 +188,9 @@ class S3Storage(BaseStorage):
         except ClientError as e:
             if e.response['Error']['Code'] == '404':
                 logger.debug('File %s in bucket %s does not exist', file_name, bucket)
-                raise FileNotFoundError(f's3://{bucket_name}/{file_name}')
+                raise FileNotFoundError(f's3://{self._bucket_name}/{file_name}')
             else:
                 raise
-
-    def get_valid_name(self, name):
-        valid_path = super(__class__, self).get_valid_name(name)
-        return 's3://' + f'{self._bucket_name}/{self._workdir}/{valid_path}'.replace('//', '/')
-
-    def _normalize_name(self, name):
-        """
-        Normalizes the name so that paths like /path/to/ignored/../something.txt
-        work. We check to make sure that the path pointed to is not outside
-        the directory specified by the LOCATION setting.
-        """
-        assert name.startswith(f's3://{self._bucket_name}/{self._workdir}/')
-        assert '../' not in name
-        in_bucket_path = name.replace(f's3://{self._bucket_name}/', '')
-        return in_bucket_path
 
     @property
     def _bucket(self) -> 's3.Bucket':
@@ -260,6 +252,11 @@ class S3Storage(BaseStorage):
                 files.append(posixpath.relpath(entry['Key'], path))
         return directories, files
 
+    def size(self, name: str) -> int:
+        normalized_name = self._normalize_name(self.get_valid_name(name))
+        s3_file = self.s3.Object(self._bucket_name, normalized_name)
+        return s3_file.content_length
+
     def url(self, name: str):
         """
         Returns the URL where the contents of the file referenced by name can be accessed.
@@ -317,6 +314,10 @@ class FilesystemStorage(BaseStorage):
     def save(self, name, content):
         path = self._normalize_name(name)
         open(path, 'wb').write(content)
+
+    def size(self, name):
+        path = self._normalize_name(name)
+        return os.path.getsize(path)
 
     def listdir(self, path):
         self._validate_path(path)
