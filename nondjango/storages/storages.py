@@ -244,7 +244,7 @@ class S3Storage(BaseStorage):
         # })
         s3_file = self.s3.Object(self._bucket_name, self._normalize_name(internal_name))
         result = s3_file.delete()
-        if 'Errors' in result or result['DeleteMarker'] != True:
+        if 'Errors' in result or result.get('DeleteMarker', True) != True:
             raise RuntimeError(f"Could not delete '{name}': {result}")
         return result
 
