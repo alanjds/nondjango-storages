@@ -330,7 +330,7 @@ class S3Storage(BaseStorage):
                 'Bucket': self._bucket_name,
                 'Key': self._normalize_name(internal_name),
             },
-            ExpiresIn=3600,
+            ExpiresIn=self._settings.get('URL_EXPIRATION', 3600),
             HttpMethod=None,
         )
         return url
