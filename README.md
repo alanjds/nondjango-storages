@@ -118,7 +118,7 @@ Most of the generally-useful interface of Django Filestorage API is implemented,
 as BaseStorage `.size()`, `.url()`, `.listdir()`, `.exists()` and `.delete()`.
 Also some extra tools like `.hash()`, that computes or grabs the file hashes if
 available. For now, S3Storage keeps the MD5 and Sha256 of the files on upload.
-filesystem-backed storages computes them on the fly.
+Filesystem-backed storages computes them on the fly.
 
 ```python
 >>> file_on_cloud = s3_storage.open('span.txt')
