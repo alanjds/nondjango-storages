@@ -14,9 +14,11 @@ module = "nondjango"
 author = "Alan Justino da Silva"
 author-email = "alan.justino@yahoo.com.br"
 home-page = "https://github.com/alanjds/nondjango-storages/"
+description-file="README.md"
 requires = [
     'boto3',
 ]
+requires-python=">=3.5"
 classifiers = [
     'Development Status :: 2 - Pre-Alpha',
     'Intended Audience :: Developers',
