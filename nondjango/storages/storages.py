@@ -216,6 +216,9 @@ class S3Storage(BaseStorage):
         # Let the errors bubble up if occur.
         bucket_exists = bucket.creation_date
         if not bucket_exists:
+            if not self._settings.get('AWS_AUTO_CREATE_BUCKET', False):
+                raise RuntimeError(f"Bucket '{self._bucket_name}' does not exists")
+
             try:
                 self.s3.create_bucket(Bucket=self._bucket_name)
             except ClientError as e:
