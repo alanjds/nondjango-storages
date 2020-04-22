@@ -208,13 +208,22 @@ class S3Storage(BaseStorage):
 
     @property
     def _bucket(self) -> 's3.Bucket':
-        try:
-            return self.s3.create_bucket(Bucket=self._bucket_name)
-        except ClientError as e:
-            if e.response['Error']['Code'] in ['BucketAlreadyExists', 'BucketAlreadyOwnedByYou']:
-                return self.s3.Bucket(self._bucket_name)
-            else:
-                raise e
+        if hasattr(self, '__bucket'):
+            return self.__bucket
+
+        bucket = self.s3.Bucket(self._bucket_name)
+        # Trigger existance check for this bucket
+        # Let the errors bubble up if occur.
+        bucket_exists = bucket.creation_date
+        if not bucket_exists:
+            try:
+                self.s3.create_bucket(Bucket=self._bucket_name)
+            except ClientError as e:
+                if e.response['Error']['Code'] not in ['BucketAlreadyExists', 'BucketAlreadyOwnedByYou']:
+                    raise
+
+        self.__bucket = bucket
+        return self.__bucket
 
     def _write(self, f, file_name):
         internal_name = self._normalize_name(file_name)
