@@ -183,10 +183,19 @@ class S3Storage(BaseStorage):
                 use_ssl=self._settings.get('S3CONF_S3_USE_SSL') or self._settings.get('AWS_S3_USE_SSL', True),
                 endpoint_url=self._settings.get('S3CONF_S3_ENDPOINT_URL') or self._settings.get('AWS_S3_ENDPOINT_URL'),
             )  # yapf: disable
+
             signature_version = (self._settings.get('S3CONF_S3_SIGNATURE_VERSION')
                                  or self._settings.get('AWS_S3_SIGNATURE_VERSION'))
+            pool_connections = self._settings.get('AWS_S3_MAX_POOL_CONNECTIONS')
+
+            botoconfig = {}
             if signature_version:
-                resource_kwargs['config'] = botocore__Config(signature_version=signature_version)
+                botoconfig['signature_version'] = signature_version
+            if pool_connections:
+                botoconfig['max_pool_connections'] = int(pool_connections)
+
+            if botoconfig:
+                resource_kwargs['config'] = botocore__Config(**botoconfig)
             self._resource = boto3.resource('s3', **resource_kwargs)
         return self._resource
 
