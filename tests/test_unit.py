@@ -27,6 +27,13 @@ MINIO_S3_SETTINGS = {
                         (storages.S3Storage, {
                             'settings': MINIO_S3_SETTINGS,
                             'workdir': f's3://nondjango-storages-test/storage-test-{uuid.uuid4()}/'
+                        }),
+                        (storages.S3Storage, {
+                            'settings': {
+                                **MINIO_S3_SETTINGS,
+                                'AWS_S3_MAX_POOL_CONNECTIONS': 30,
+                            },
+                            'workdir': f's3://nondjango-storages-test/storage-test-{uuid.uuid4()}/'
                         })],
                 ids=lambda x: x[0])
 def storage(request):
