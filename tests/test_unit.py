@@ -95,6 +95,7 @@ def test_file_url():
     with storage.open('test_file.txt', 'w+') as f:
         f.write(payload)
 
+    assert storage.url('inexistent_file', check_for_inexistent=False), 'Checking before producing the URL?'
     assert storage.url('inexistant_file') is None, 'Generating URLs for inexistent files?'
 
     test_file_url = storage.url('test_file.txt')
