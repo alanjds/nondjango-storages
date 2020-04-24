@@ -320,7 +320,7 @@ class S3Storage(BaseStorage):
         else:
             return s3_file.e_tag
 
-    def url(self, name: str, check_for_inexistent=False):
+    def url(self, name: str, check_for_inexistent=True) -> str:
         """
         Returns the URL where the contents of the file referenced by name can be accessed.
         This can raise NotImplementedError depending on the backend used.
