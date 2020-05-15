@@ -4,6 +4,7 @@ import tempfile
 import boto3
 import posixpath
 import hashlib
+from gzip import GzipFile
 from botocore.exceptions import ClientError
 from botocore.client import Config as botocore__Config
 from io import BytesIO, StringIO
@@ -257,6 +258,24 @@ class S3Storage(BaseStorage):
                 },
             },
         )
+
+    def _compress_content(self, content: 'filelike') -> 'filelike':
+        """
+        Gzip a given bytes content.
+        """
+        content.seek(0)
+        zbuf = BytesIO()
+        #  The GZIP header has a modification time attribute (see http://www.zlib.org/rfc-gzip.html)
+        #  This means each time a file is compressed it changes even if the other contents don't change
+        #  For S3 this defeats detection of changes using MD5 sums on gzipped files
+        #  Fixing the mtime at 0.0 at compression time avoids this problem
+        zfile = GzipFile(mode='wb', fileobj=zbuf, mtime=0.0)
+        try:
+            zfile.write(content.read())
+        finally:
+            zfile.close()
+        zbuf.seek(0)
+        return zbuf
 
     def delete(self, name):
         internal_name = self.get_valid_name(name)
