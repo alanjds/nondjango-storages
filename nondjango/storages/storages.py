@@ -269,6 +269,24 @@ class S3Storage(BaseStorage):
             raise RuntimeError(f"Could not delete '{name}': {result}")
         return result
 
+    def exists(self, name) -> bool:
+        """
+        Return True if a file referenced by the given name already exists in the
+        storage system, or False if the name is available for a new file.
+        """
+        internal_name = self.get_valid_name(name)
+        s3_file = self.s3.Object(self._bucket_name, self._normalize_name(internal_name))
+
+        try:
+            # See if the resource exists via a HEAD call to get the e-tag
+            s3_file.e_tag
+        except ClientError as err:
+            err_msg = str(err)
+            if '404' in err_msg and 'Not Found' in err_msg:
+                return False
+            raise
+        return True
+
     def list(self, path):
         valid_name = self.get_valid_name(path)
         logger.debug('Listing %s', valid_name)
