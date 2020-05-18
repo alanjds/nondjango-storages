@@ -7,7 +7,7 @@ import hashlib
 from gzip import GzipFile
 from botocore.exceptions import ClientError
 from botocore.client import Config as botocore__Config
-from io import BytesIO, StringIO
+from io import BytesIO, StringIO, SEEK_END
 
 from .utils import prepare_path, md5s3
 from .files import File
@@ -352,6 +352,9 @@ class S3Storage(BaseStorage):
     def size(self, name: str) -> int:
         normalized_name = self._normalize_name(self.get_valid_name(name))
         s3_file = self.s3.Object(self._bucket_name, normalized_name)
+        s3_file.load()  # Get metadata via HEAD
+        if s3_file.content_encoding == 'gzip':
+            return int(s3_file.metadata.get('original_size'.capitalize(), s3_file.content_length))
         return s3_file.content_length
 
     def _file_hash(self, file: File, function='') -> str:

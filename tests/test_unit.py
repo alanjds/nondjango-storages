@@ -19,6 +19,7 @@ MINIO_S3_SETTINGS = {
     'AWS_S3_REGION_NAME': 'us-east-1',
     'AWS_S3_ENDPOINT_URL': 'https://play.min.io:9000',
     'AWS_S3_SIGNATURE_VERSION': 's3v4',
+    'AWS_AUTO_CREATE_BUCKET': True,
 }
 
 
@@ -32,6 +33,13 @@ MINIO_S3_SETTINGS = {
                             'settings': {
                                 **MINIO_S3_SETTINGS,
                                 'AWS_S3_MAX_POOL_CONNECTIONS': 30,
+                            },
+                            'workdir': f's3://nondjango-storages-test/storage-test-{uuid.uuid4()}/'
+                        }),
+                        (storages.S3Storage, {
+                            'settings': {
+                                **MINIO_S3_SETTINGS,
+                                'AWS_IS_GZIPPED': True,
                             },
                             'workdir': f's3://nondjango-storages-test/storage-test-{uuid.uuid4()}/'
                         })],
