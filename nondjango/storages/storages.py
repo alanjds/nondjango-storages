@@ -209,6 +209,8 @@ class S3Storage(BaseStorage):
         try:
             s3_file.download_fileobj(stream)
             stream.seek(0)
+            if s3_file.content_encoding == 'gzip':
+                stream = GzipFile(mode=getattr(stream, 'mode', 'rb+'), fileobj=stream, mtime=0.0)
             return stream
         except ClientError as e:
             if e.response['Error']['Code'] == '404':
@@ -248,19 +250,25 @@ class S3Storage(BaseStorage):
         f.seek(0)
         content_sha256 = hashlib.sha256(f.read()).hexdigest()
 
-        f.seek(0)
-        self._bucket.upload_fileobj(
-            f,
-            internal_name,
-            ExtraArgs={
-                "Metadata": {
-                    'md5': content_md5,
-                    'sha256': content_sha256,
-                },
+        extra_args = {
+            "Metadata": {
+                'md5': content_md5,
+                'sha256': content_sha256,
             },
-        )
+        }
 
-    def _compress_content(self, content: 'filelike') -> 'filelike':
+        if self._settings.get('AWS_IS_GZIPPED', False):
+            f.seek(0, SEEK_END)
+            extra_args['Metadata']['original_size'] = str(f.tell())
+
+            f.seek(0)
+            f = self._compress_content(f)
+            extra_args['ContentEncoding'] = 'gzip'
+
+        f.seek(0)
+        self._bucket.upload_fileobj(f, internal_name, ExtraArgs=extra_args)
+
+    def _compress_content(self, content: 'filelike') -> BytesIO:
         """
         Gzip a given bytes content.
         """
