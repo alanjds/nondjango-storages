@@ -201,17 +201,18 @@ class S3Storage(BaseStorage):
         return self._resource
 
     def read_into_stream(self, file_path, stream=None):
-        file_name = f'{self._workdir}/{file_path}'
+        file_name = self._normalize_name(self.get_valid_name(file_path))
 
         stream = stream or BytesIO()
-        bucket = self.s3.Bucket(self._bucket_name)
+        s3_file = self.s3.Object(self._bucket_name, file_name)
+
         try:
-            bucket.download_fileobj(file_name, stream)
+            s3_file.download_fileobj(stream)
             stream.seek(0)
             return stream
         except ClientError as e:
             if e.response['Error']['Code'] == '404':
-                logger.debug('File %s in bucket %s does not exist', file_name, bucket)
+                logger.debug('File %s in bucket %s does not exist', file_name, self._bucket_name)
                 raise FileNotFoundError(f's3://{self._bucket_name}/{file_name}')
             else:
                 raise
