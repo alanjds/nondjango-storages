@@ -168,6 +168,7 @@ class S3Storage(BaseStorage):
         self._resource = None
         self._bucket_name, self._workdir = _strip_s3_path(workdir)
         self._workdir = os.path.relpath(self._workdir) if self._workdir else ''
+        self._bucket  # Raises error on unavailable bucket
 
     @property
     def s3(self):
