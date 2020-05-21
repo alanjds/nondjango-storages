@@ -4,9 +4,10 @@ import tempfile
 import boto3
 import posixpath
 import hashlib
+from gzip import GzipFile
 from botocore.exceptions import ClientError
 from botocore.client import Config as botocore__Config
-from io import BytesIO, StringIO
+from io import BytesIO, StringIO, SEEK_END
 
 from .utils import prepare_path, md5s3
 from .files import File
@@ -200,17 +201,20 @@ class S3Storage(BaseStorage):
         return self._resource
 
     def read_into_stream(self, file_path, stream=None):
-        file_name = f'{self._workdir}/{file_path}'
+        file_name = self._normalize_name(self.get_valid_name(file_path))
 
         stream = stream or BytesIO()
-        bucket = self.s3.Bucket(self._bucket_name)
+        s3_file = self.s3.Object(self._bucket_name, file_name)
+
         try:
-            bucket.download_fileobj(file_name, stream)
+            s3_file.download_fileobj(stream)
             stream.seek(0)
+            if s3_file.content_encoding == 'gzip':
+                stream = GzipFile(mode=getattr(stream, 'mode', 'rb+'), fileobj=stream, mtime=0.0)
             return stream
         except ClientError as e:
             if e.response['Error']['Code'] == '404':
-                logger.debug('File %s in bucket %s does not exist', file_name, bucket)
+                logger.debug('File %s in bucket %s does not exist', file_name, self._bucket_name)
                 raise FileNotFoundError(f's3://{self._bucket_name}/{file_name}')
             else:
                 raise
@@ -246,17 +250,41 @@ class S3Storage(BaseStorage):
         f.seek(0)
         content_sha256 = hashlib.sha256(f.read()).hexdigest()
 
-        f.seek(0)
-        self._bucket.upload_fileobj(
-            f,
-            internal_name,
-            ExtraArgs={
-                "Metadata": {
-                    'md5': content_md5,
-                    'sha256': content_sha256,
-                },
+        extra_args = {
+            "Metadata": {
+                'md5': content_md5,
+                'sha256': content_sha256,
             },
-        )
+        }
+
+        if self._settings.get('AWS_IS_GZIPPED', False):
+            f.seek(0, SEEK_END)
+            extra_args['Metadata']['original_size'] = str(f.tell())
+
+            f.seek(0)
+            f = self._compress_content(f)
+            extra_args['ContentEncoding'] = 'gzip'
+
+        f.seek(0)
+        self._bucket.upload_fileobj(f, internal_name, ExtraArgs=extra_args)
+
+    def _compress_content(self, content: 'filelike') -> BytesIO:
+        """
+        Gzip a given bytes content.
+        """
+        content.seek(0)
+        zbuf = BytesIO()
+        #  The GZIP header has a modification time attribute (see http://www.zlib.org/rfc-gzip.html)
+        #  This means each time a file is compressed it changes even if the other contents don't change
+        #  For S3 this defeats detection of changes using MD5 sums on gzipped files
+        #  Fixing the mtime at 0.0 at compression time avoids this problem
+        zfile = GzipFile(mode='wb', fileobj=zbuf, mtime=0.0)
+        try:
+            zfile.write(content.read())
+        finally:
+            zfile.close()
+        zbuf.seek(0)
+        return zbuf
 
     def delete(self, name):
         internal_name = self.get_valid_name(name)
@@ -324,6 +352,9 @@ class S3Storage(BaseStorage):
     def size(self, name: str) -> int:
         normalized_name = self._normalize_name(self.get_valid_name(name))
         s3_file = self.s3.Object(self._bucket_name, normalized_name)
+        s3_file.load()  # Get metadata via HEAD
+        if s3_file.content_encoding == 'gzip':
+            return int(s3_file.metadata.get('original_size'.capitalize(), s3_file.content_length))
         return s3_file.content_length
 
     def _file_hash(self, file: File, function='') -> str:
